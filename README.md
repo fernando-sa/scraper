@@ -8,7 +8,7 @@ Simply donwload it, run npm install to install all dependecies and run index.js 
 
 ## Usage
 
-Visit `127.0.0.1:8000/get/:linkToBeginScraping/:ScrapingDepth` and it will return all links found in scraping.
+Visit `127.0.0.1:8000/get/:linkToBeginScraping/:scrapingDepth` and it will return all links found in scraping.
 
 ## Features
 
@@ -16,7 +16,7 @@ It can go through every <a> tag that it find and scrape through that link. In ne
 
 ## Is it realiable?
 
-**NO!!** This should not be used as an reliable source of information scraping as it is a fun not serious projects. Through development I notice some inconsistency that i really don't want to spend time refining.
+**NO!!** This should not be used as an reliable source of information scraping as it is a fun not serious project. Through development I notice some inconsistency that i really don't want to spend time refining.
 
 ## Challenges
 
