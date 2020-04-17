@@ -3,43 +3,47 @@ const cheerio = require('cheerio');
 
 var consumedLinks = [];
 var futureLinks = [];
+
+var linksWithStrings;
+var searchingString;
+var targetString;
+
 var maxIndexingDepth;
 var urlRange;
 var robots;
 
+
 class Scraper {
 
-    initCrawl(url, maxDepth,call){
-        consumedLinks = [];
-        futureLinks = []
+    initCrawl(url, maxDepth, options, call){
+        this.resetScrapingState(url, maxDepth);
 
-        maxIndexingDepth = maxDepth;
-        urlRange = url.split(".").slice(-2).join(".");
+        this.parseScrapingOptions(options, () => {
 
-        this.parseRobots(() => {
+            this.parseRobots(() => {
+                if(this.robotsBlockAll()){
+                    call("Robots block all access");
+                    return;
+                };
 
-            if(this.robotsBlockAll()){
-                call("Robots block all access");
-                return;
-            };
-
-            if (maxIndexingDepth == 0) {
-                call('Profundidade de indexação = 0!')
-            }else{
-                this.parseForLinks(url, 0, () => {
-                    // Return all links discovered
-                    call(consumedLinks.concat(futureLinks));
-                });
-            }
+                if (maxIndexingDepth == 0) {
+                    call('Profundidade de indexação = 0!')
+                }else{
+                    this.parseLink(url, 0, () => {
+                        // Return all links discovered
+                        call(this.gatherResponse());
+                    });
+                }
+            });
         });
 
     }
 
-    parseForLinks(url, currentIndexingDepth, callback){
+    parseLink(url, currentIndexingDepth, callback){
 
-        console.log("VisitedLinks = " + consumedLinks.length + " - Discovered Links = " + (futureLinks.length + consumedLinks.length));
+        // console.log("VisitedLinks = " + consumedLinks.length + " - Discovered Links = " + (futureLinks.length + consumedLinks.length));
         // console.log("Indexing current url = " + url);
-        
+
 
         if(currentIndexingDepth >= maxIndexingDepth){
             callback();
@@ -48,8 +52,6 @@ class Scraper {
 
         let discoveredLinks = [];
         let self = this;
-
-        consumedLinks.push(url);
 
         request({url: 'https://' + self.formatUrl(url), timeout : 10000, followRedirect : false}, function (error, response, body) {
             let indexedLinksCounter = 0;
@@ -71,6 +73,8 @@ class Scraper {
 
                 });
 
+                if(searchingString == true)
+                    self.scrapeForString(url, $);
 
             }else{
                 console.log("Erro na url: " + url + " detalhe: " + error);
@@ -87,7 +91,7 @@ class Scraper {
 
             for (const discoveredLink of discoveredLinks) {
 
-                self.parseForLinks(self.removeProtocol(discoveredLink), currentIndexingDepth + 1,() => {
+                self.parseLink(self.removeProtocol(discoveredLink), currentIndexingDepth + 1,() => {
                     indexedLinksCounter++;
                     // console.log(discoveredLink);
                     if(indexedLinksCounter == discoveredLinks.length){
@@ -101,6 +105,11 @@ class Scraper {
         });
 
 
+    }
+
+    scrapeForString(url, $){
+        if($('body').html().includes(targetString))
+            linksWithStrings.push(url);
     }
 
     isIndexed(url){
@@ -155,9 +164,9 @@ class Scraper {
                 // Remove user agent specification and disallow text, leaving only the url we cant access
                 for (let i = 0; i < robots.length; i++) {
                     if (robots[i].includes('Disallow: ')){
-                        
+
                         robots[i] = robots[i].replace('Disallow: ', '');
-                        
+
                         // Put / before all rules to make it easier to compare it to urls
                         if(robots[i][0] != "/")
                             robots[i] = "/" + robots[i];
@@ -173,12 +182,12 @@ class Scraper {
                     robots.splice(indexToDelete, 1);
                 }
 
-                callback();
+                callback()
                 return;
 
             }else{
                 console.log(error);
-                callback("Pane no robots");
+                callback()
                 return;
             }
 
@@ -188,10 +197,10 @@ class Scraper {
 
     isAllowedByRobots(url){
         url = this.removeProtocol(this.removeUrlRange(url));
-        
+
         // Break it into "/" and "?"
         url = url.split(/(?=[/?])/)
-        
+
         let rule;
         let equalPart;
 
@@ -199,7 +208,7 @@ class Scraper {
         for (let i = 0; i < robots.length; i++) {
             rule = robots[i].split(/(?=[/?])/);
             equalPart = 0;
-            
+
             // Iterate through every "/" of the rule
             for (let j = 0; j < rule.length; j++) {
 
@@ -212,7 +221,7 @@ class Scraper {
                     if(equalPart == rule.length) return false;
                 }
             }
-        
+
         }
 
         // If we passed through every rule and didn't had a match, it is allowed
@@ -227,6 +236,38 @@ class Scraper {
         }
 
         return false;
+    }
+
+    resetScrapingState(url, maxDepth){
+        consumedLinks = [];
+        futureLinks = []
+
+        var searchingString = false;
+
+
+        maxIndexingDepth = maxDepth;
+        urlRange = url.split(".").slice(-2).join(".");
+
+    }
+
+    parseScrapingOptions(options, callback){
+        if(options.hasOwnProperty('searchString')){
+            linksWithStrings = [];
+            searchingString = true;
+            targetString = options.searchString;
+        }
+        callback();
+        return;
+    }
+
+    gatherResponse(){
+        
+        console.log(linksWithStrings);
+
+        if(searchingString)
+            return linksWithStrings;
+
+        consumedLinks.concat(futureLinks)
     }
 }
 
