@@ -3,14 +3,14 @@ var app = express();
 
 var scraper = require('./scraper.js');
 
-app.get('/get/:url/:depth', function (req, res) {
+app.get('/scrape', function (req, res) {
     console.time("time")
-    scraper.initCrawl(req.params.url,
-                        req.params.depth,
-                        {searchString: 'Sublocar'},
+    scraper.initScraping(req.query.url,
+                        req.query.depth,
+                        JSON.parse(req.query.targets),
                         function(callback){
                             console.timeEnd("time");
-                            res.send(callback);
+                            res.send(JSON.stringify(callback) + " \n");
                         });
 });
 

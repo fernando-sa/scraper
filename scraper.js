@@ -4,9 +4,16 @@ const cheerio = require('cheerio');
 var consumedLinks = [];
 var futureLinks = [];
 
-var linksWithStrings;
-var searchingString;
+var scrapingTargets = [];
+
+scrapingTargets['images'] = false;
+scrapingTargets['strings'] = false;
+scrapingTargets['links'] = false;
+
 var targetString;
+var linksWithStrings;
+
+var images;
 
 var maxIndexingDepth;
 var urlRange;
@@ -15,10 +22,26 @@ var robots;
 
 class Scraper {
 
-    initCrawl(url, maxDepth, options, call){
-        this.resetScrapingState(url, maxDepth);
+    initScraping(url, maxDepth, options, call){
+
+        scrapingTargets['strings'] = false;
+        scrapingTargets['images'] = false;
+        scrapingTargets['links'] = false;
 
         this.parseScrapingOptions(options, () => {
+
+            if(! this.validateParameters(url, maxDepth)){
+                call('Invalid parameters');
+                return;
+            }
+
+            if(! this.checkScrapingTargets()){
+                call('No scraping target was set');
+                return;
+            }
+
+            this.resetScrapingState(url, maxDepth);
+
 
             this.parseRobots(() => {
                 if(this.robotsBlockAll()){
@@ -27,7 +50,7 @@ class Scraper {
                 };
 
                 if (maxIndexingDepth == 0) {
-                    call('Profundidade de indexação = 0!')
+                    call('Indexing max depth = 0!')
                 }else{
                     this.parseLink(url, 0, () => {
                         // Return all links discovered
@@ -73,17 +96,19 @@ class Scraper {
 
                 });
 
-                if(searchingString == true)
+                if(scrapingTargets['strings'] == true)
                     self.scrapeForString(url, $);
 
+                if(scrapingTargets['images'] == true)
+                    self.scrapeForImages($)
+
             }else{
-                console.log("Erro na url: " + url + " detalhe: " + error);
+                console.log("Erro in : " + url + " detail: " + error);
                 callback();
                 return;
             }
 
             if (discoveredLinks.length == 0){
-                // console.log('Zerou!');
                 callback();
                 return;
 
@@ -95,7 +120,6 @@ class Scraper {
                     indexedLinksCounter++;
                     // console.log(discoveredLink);
                     if(indexedLinksCounter == discoveredLinks.length){
-                        // console.log('Chegou no último!');
                         callback(discoveredLinks);
                         return;
                     }
@@ -110,6 +134,19 @@ class Scraper {
     scrapeForString(url, $){
         if($('body').html().includes(targetString))
             linksWithStrings.push(url);
+    }
+
+    scrapeForImages($){
+        let link;
+
+        $('img').each(function(){
+            link = $(this).attr('src');
+
+            if(! images.includes(link)){
+                images.push(link);
+            }
+
+        });
     }
 
     isIndexed(url){
@@ -242,32 +279,64 @@ class Scraper {
         consumedLinks = [];
         futureLinks = []
 
-        var searchingString = false;
-
-
         maxIndexingDepth = maxDepth;
+
         urlRange = url.split(".").slice(-2).join(".");
+
 
     }
 
     parseScrapingOptions(options, callback){
         if(options.hasOwnProperty('searchString')){
+            
             linksWithStrings = [];
-            searchingString = true;
+            scrapingTargets['strings'] = true;
             targetString = options.searchString;
+        }
+        
+        if(options.hasOwnProperty('searchImages')){
+            images = [];
+            scrapingTargets['images'] = true;
+        }
+
+        if(options.hasOwnProperty('searchLinks')){
+            scrapingTargets['links'] = true;
         }
         callback();
         return;
     }
 
     gatherResponse(){
-        
-        console.log(linksWithStrings);
 
-        if(searchingString)
-            return linksWithStrings;
+        let response = {};
 
-        consumedLinks.concat(futureLinks)
+        if(scrapingTargets['strings'])
+            response.strings = linksWithStrings;
+
+        if(scrapingTargets['images'])
+            response.images = images;
+
+        if(scrapingTargets['links'])
+            response.links = consumedLinks.concat(futureLinks);
+
+        console.log(response)
+        return response;
+    }
+
+    checkScrapingTargets(){
+        for (const target in scrapingTargets) {
+            if(scrapingTargets[target] == true) return true
+            
+        }
+        return false;
+    }
+    
+    validateParameters(url, maxDepth){
+        if(typeof url != "string" || typeof maxDepth != "string"){
+            return false;
+        }
+
+        return true;
     }
 }
 
